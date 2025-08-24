@@ -1,22 +1,24 @@
 const express = require('express');
-const http = require('http');
-const { Server } = require('socket.io');
+const app = express();
 const path = require('path');
 
-const app = express();
-const server = http.createServer(app);
-const io = new Server(server);
+app.use(express.static(__dirname));
 
-app.use(express.static(path.join(__dirname, 'public')));
+app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
+app.get('/client.html', (req, res) => res.sendFile(path.join(__dirname, 'client.html')));
+app.get('/admin.html', (req, res) => res.sendFile(path.join(__dirname, 'admin.html')));
 
-io.on('connection', socket => {
-  console.log('User connected:', socket.id);
-
-  socket.on('offer', offer => socket.broadcast.emit('offer', offer));
-  socket.on('answer', answer => socket.broadcast.emit('answer', answer));
-  socket.on('ice-candidate', candidate => socket.broadcast.emit('ice-candidate', candidate));
-
-  socket.on('disconnect', () => console.log('User disconnected:', socket.id));
+const server = require('http').createServer(app);
+const io = require('socket.io')(server, {
+  cors: { origin: '*' } // allows connections from any origin
 });
 
-server.listen(3000, () => console.log('Server running at http://localhost:3000'));
+io.on('connection', socket => {
+  socket.on('offer', data => socket.broadcast.emit('offer', data));
+  socket.on('answer', data => socket.broadcast.emit('answer', data));
+  socket.on('ice-candidate', data => socket.broadcast.emit('ice-candidate', data));
+});
+
+// Use PORT provided by Render
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
