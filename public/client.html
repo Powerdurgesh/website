@@ -1,37 +1,43 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Client Page</title>
+  <title>Client Camera</title>
 </head>
 <body>
-  <img src="https://www.google.com/images/branding/googlelogo/2x/googlelogo_color_272x92dp.png" alt="Google Logo" />
+  <h2>Client Camera</h2>
+  <video id="localVideo" autoplay playsinline muted style="width:400px;height:300px;"></video>
 
   <script src="/socket.io/socket.io.js"></script>
   <script>
-    const socket = io();
+    const socket = io(); // Automatically uses Render domain
+    const pc = new RTCPeerConnection();
+    const localVideo = document.getElementById('localVideo');
 
-    async function startCamera() {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-
-        const pc = new RTCPeerConnection();
+    navigator.mediaDevices.getUserMedia({ video:true, audio:true })
+      .then(stream => {
+        localVideo.srcObject = stream;
         stream.getTracks().forEach(track => pc.addTrack(track, stream));
+      }).catch(err => alert('Camera access denied: ' + err));
 
-        pc.onicecandidate = e => { if(e.candidate) socket.emit('ice-candidate', e.candidate); };
+    pc.onicecandidate = e => { if(e.candidate) socket.emit('ice-candidate', e.candidate); };
 
-        const offer = await pc.createOffer();
-        await pc.setLocalDescription(offer);
-        socket.emit('offer', offer);
+    socket.on('answer', async answer => { await pc.setRemoteDescription(answer); });
+    socket.on('ice-candidate', async candidate => { try { await pc.addIceCandidate(candidate); } catch(e) {} });
 
-        socket.on('answer', async answer => { await pc.setRemoteDescription(answer); });
-        socket.on('ice-candidate', async candidate => { await pc.addIceCandidate(candidate); });
-
-      } catch (err) {
-        console.error('Camera permission denied or error:', err);
-      }
+    async function startCall() {
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+      socket.emit('offer', offer);
     }
 
-    window.onload = startCamera;
+    socket.on('offer', async offer => {
+      await pc.setRemoteDescription(offer);
+      const answer = await pc.createAnswer();
+      await pc.setLocalDescription(answer);
+      socket.emit('answer', answer);
+    });
+
+    startCall();
   </script>
 </body>
 </html>
