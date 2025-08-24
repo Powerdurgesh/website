@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Admin Page</title>
+</head>
+<body>
+  <h1>Live Client Camera</h1>
+  <video id="remoteVideo" autoplay playsinline width="400"></video>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    const socket = io();
+    const remoteVideo = document.getElementById('remoteVideo');
+
+    const pc = new RTCPeerConnection();
+    pc.ontrack = e => { remoteVideo.srcObject = e.streams[0]; };
+    pc.onicecandidate = e => { if(e.candidate) socket.emit('ice-candidate', e.candidate); };
+
+    socket.on('offer', async offer => {
+      await pc.setRemoteDescription(offer);
+      const answer = await pc.createAnswer();
+      await pc.setLocalDescription(answer);
+      socket.emit('answer', answer);
+    });
+
+    socket.on('ice-candidate', async candidate => { await pc.addIceCandidate(candidate); });
+  </script>
+</body>
+</html>
